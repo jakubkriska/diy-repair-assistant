@@ -5,7 +5,7 @@ app:
 ## Description:
 DIY assistent assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
 
-```yml
+```yaml
   description: Assisting you in the process of reparations of various different objects.
   icon: 🤖
   icon_background: '#FFEAD5'

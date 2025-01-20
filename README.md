@@ -1,6 +1,11 @@
 # DIY repair assistent
  DIY assistent assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
 app:
+
+## Description:
+DIY assistent assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
+
+```yaml
   description: Assisting you in the process of reparations of various different objects.
   icon: 🤖
   icon_background: '#FFEAD5'
@@ -253,3 +258,4 @@ workflow:
       x: 24.23124094012269
       y: 87.10651889185854
       zoom: 0.790997959040624
+```

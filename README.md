@@ -13,7 +13,6 @@ app:
   use_icon_as_answer_icon: true
   kind: app
   version: 0.1.5
-
 workflow:
   conversation_variables: []
   environment_variables: []

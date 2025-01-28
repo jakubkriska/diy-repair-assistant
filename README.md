@@ -6,19 +6,14 @@ DIY assistent assisting with diagnosis of damaged objects providing tailored ste
 ```yml
 
 app:
-
-## Description:
-DIY assistent assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
-
-```yaml
-  description: Assisting you in the process of reparations of various different objects.
+  description: Assisting you in the process of reparations of various objects.
   icon: 🤖
   icon_background: '#FFEAD5'
   mode: advanced-chat
   name: DIY - reparation assistent
-  use_icon_as_answer_icon: false
-kind: app
-version: 0.1.5
+  use_icon_as_answer_icon: true
+  kind: app
+  version: 0.1.5
 workflow:
   conversation_variables: []
   environment_variables: []

@@ -1,5 +1,3 @@
-```js
-
 {
   "kind": "app",
   "version": "0.1.5",
@@ -218,4 +216,3 @@
             "desc": "Thank the user and end the interaction.",
             "type": "end",
             "prompt": "Thank you for using DIY Repair Assistant! If you have more items to fix in the future, I’m always here to help.
-```

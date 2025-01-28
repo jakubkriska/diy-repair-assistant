@@ -1,4 +1,4 @@
-# DIY repair assistent
+# DIY repair assistant
 
 ## Description:
 DIY assistent assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.

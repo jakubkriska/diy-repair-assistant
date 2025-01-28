@@ -29,6 +29,7 @@ The DIY Repair Assistant is a chatbot designed to guide users through repairing 
 - **DIY Enthusiasts**: For anyone who loves fixing things themselves.
 - **Homeowners**: Solve common household repairs without professional help.
 - **Sustainability Advocates**: Encourage reuse and reduce waste by repairing instead of replacing.
+- **Insurance Companies**: 
 
 ---
 
@@ -40,26 +41,15 @@ The DIY Repair Assistant is a chatbot designed to guide users through repairing 
 ---
 
 ## **How to Set Up**
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/diy-repair-assistant.git
-   ```
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Run the bot locally:
-   ```bash
-   python app.py
-   ```
-4. Customize the YAML configuration to add or modify repair workflows.
+
+- in progress...
 
 ---
 
 ## **Future Plans**
 - Integration with voice assistants for hands-free repair guidance.
 - Multi-language support.
-- Advanced photo analysis for better problem diagnosis.
+- Advanced photo analysis for problem diagnosis.
 
 ---
 

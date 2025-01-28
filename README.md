@@ -1,210 +1,67 @@
-# DIY repair assistant
+# DIY Repair Assistant 🤖🛠️
 
-## Description:
-DIY assistant assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
+## **Overview**
+The DIY Repair Assistant is a chatbot designed to guide users through repairing household items. It provides step-by-step instructions, material recommendations, and visual aids, making it a helpful and cost-effective solution for solving common repair issues at home. The assistant is customizable and supports both text and image inputs to ensure precise and efficient diagnoses.
 
-```yml
-app:
-  description: Assisting you in the process of reparations of various objects.
-  icon: 🤖
-  icon_background: '#FFEAD5'
-  mode: advanced-chat
-  name: DIY - reparation assistant
-  use_icon_as_answer_icon: true
-  kind: app
-  version: 0.1.5
-workflow:
-  conversation_variables: []
-  environment_variables: []
-  features:
-    file_upload:
-      allowed_file_extensions:
-        - .JPG
-        - .JPEG
-        - .PNG
-        - .GIF
-        - .WEBP
-        - .SVG
-      allowed_file_types:
-        - image
-      allowed_file_upload_methods:
-        - local_file
-        - remote_url
-      enabled: false
-      fileUploadConfig:
-        audio_file_size_limit: 50
-        batch_count_limit: 5
-        file_size_limit: 15
-        image_file_size_limit: 10
-        video_file_size_limit: 100
-        workflow_file_upload_limit: 10
-    retriever_resource:
-      enabled: true
-    sensitive_word_avoidance:
-      enabled: false
-    speech_to_text:
-      enabled: false
-    suggested_requests:
-      - "Help me fix a [specific item] that is [specific issue]."
-      - "What tools or materials do I need to repair a [specific item]?"
-      - "How do I replace a broken part in my [specific item]?"
-      - "Guide me through fixing a [specific item] with [visible damage]."
-      - "Can you help me diagnose why my [specific item] is not working?"
-    suggested_questions_after_answer:
-      enabled: false
-    text_to_speech:
-      enabled: false
-      language: ''
-      voice: ''
-    opening_statement: >
-      Hello! I'm your DIY Repair Assistant. 🛠️
+---
 
-      I’m here to help you repair household items with step-by-step guidance based on
-      common repair techniques and examples. Please note that my suggestions are general
-      and may need some adaptation to fit your specific situation. Also, I only assist
-      with **item repairs**—not medical, legal, or other non-repair-related topics.
+## **Features**
+- **Step-by-step Repair Guidance**: The assistant walks users through the repair process for items such as furniture, appliances, and electronics.
+- **Customizable Prompts**: Users can describe the problem or upload a photo for personalized assistance.
+- **Material Recommendations**: Suggests tools and materials needed for the repair, with links for easy purchasing.
+- **Visual Support**: Provides diagrams and videos for better clarity during complex repairs.
+- **Flexible Workflow**: Handles multiple repairs in a single session by allowing users to restart after completing one.
 
-      To get started, here’s how you can help me help you:
-      1️⃣ Tell me what item you’re repairing (e.g., chair, faucet, phone).
-      2️⃣ Describe the specific issue (e.g., wobbly, leaking, not turning on).
-      3️⃣ Let me know if there’s any visible damage (e.g., cracks, wear, fraying).
+---
 
-      You can also upload a photo of the item for more precise guidance. Let’s fix it together!
+## **How It Works**
+1. The bot asks the user to specify the item and the issue they are facing.
+2. Based on the user’s description (or photo), the assistant:
+   - Diagnoses the problem.
+   - Recommends tools, materials, and techniques for repair.
+   - Provides step-by-step guidance.
+3. Offers motivational tips and visual aids if needed.
+4. Asks if the user has additional items to repair before ending the session.
 
-  graph:
-    edges:
-      - data:
-          sourceType: start
-          targetType: llm
-        id: start-to-llm
-        source: start
-        target: llm
-        type: custom
-      - data:
-          sourceType: llm
-          targetType: visual_support
-        id: llm-to-visual-support
-        source: llm
-        target: visual_support
-        type: custom
-      - data:
-          sourceType: visual_support
-          targetType: material_recommendations
-        id: visual-support-to-material-recommendations
-        source: visual_support
-        target: material_recommendations
-        type: custom
-      - data:
-          sourceType: material_recommendations
-          targetType: motivation_and_support
-        id: material-recommendations-to-motivation
-        source: material_recommendations
-        target: motivation_and_support
-        type: custom
-      - data:
-          sourceType: motivation_and_support
-          targetType: check_another_repair
-        id: motivation-to-check
-        source: motivation_and_support
-        target: check_another_repair
-        type: custom
-      - data:
-          sourceType: check_another_repair
-          targetType: start
-          condition: "yes"
-        id: check-to-start
-        source: check_another_repair
-        target: start
-        type: custom
-      - data:
-          sourceType: check_another_repair
-          targetType: end
-          condition: "no"
-        id: check-to-end
-        source: check_another_repair
-        target: end
-        type: custom
+---
 
-    nodes:
-      - data:
-          title: Start
-          desc: "Initial node where the repair process begins."
-          type: start
-        id: start
-        position:
-          x: 80
-          y: 100
-      - data:
-          title: Visual Support
-          desc: "Provides visual aids (diagrams, videos) to help with the repair."
-          type: visual_support
-          prompt: >
-            Here are some visual aids to help you:
-            - **Video Guide**: {video_link}
-            - **Step Diagrams**: {diagram_link}
+## **Use Cases**
+- **DIY Enthusiasts**: For anyone who loves fixing things themselves.
+- **Homeowners**: Solve common household repairs without professional help.
+- **Sustainability Advocates**: Encourage reuse and reduce waste by repairing instead of replacing.
 
-            Let me know if you need further clarification!
-          next_step: material_recommendations
-        id: visual_support
-        position:
-          x: 300
-          y: 200
-      - data:
-          title: Material Recommendations
-          desc: "Suggests materials and tools needed for the repair."
-          type: material_recommendations
-          prompt: >
-            To complete this repair, you’ll need:
-            - **{material_1}**: [Buy here]({link_1})
-            - **{material_2}**: [Buy here]({link_2})
-            - **{material_3}**: [Buy here]({link_3})
+---
 
-            Would you like me to find materials in your local area or suggest alternatives?
-          input:
-            type: multiple_choice
-            choices:
-              - Local materials
-              - Alternatives
-          next_step: motivation_and_support
-        id: material_recommendations
-        position:
-          x: 300
-          y: 400
-      - data:
-          title: Motivation and Support
-          desc: "Motivates the user and provides encouragement."
-          type: motivation_and_support
-          prompt: >
-            You’re doing great! Keep going—you’ll have this fixed in no time. 😊
+## **Technologies Used**
+- **YAML Workflow Configuration**: Define the assistant’s structure and responses.
+- **Chat Models**: Powered by large language models to generate accurate and user-friendly responses.
+- **Customizable UI**: Tailored for seamless integration into chat platforms.
 
-            If you run into any trouble, feel free to ask me questions or upload a picture of your progress.
-        id: motivation_and_support
-        position:
-          x: 500
-          y: 600
-      - data:
-          title: Check Another Repair
-          desc: "Asks if the user has more items to repair."
-          type: check_another_repair
-          prompt: >
-            Is there anything else I can help you with? For example, do you have another item that needs repair?
-          input:
-            type: yes_no
-            next_step:
-              yes: start
-              no: end
-        id: check_another_repair
-        position:
-          x: 700
-          y: 800
-      - data:
-          title: End
-          desc: "Thank the user and end the interaction."
-          type: end
-          prompt: >
-            Thank you for using DIY Repair Assistant! If you have more items to fix in the future, I’m always here to help. Happy repairing! 🛠️
-        id: end
-        position:
-          x: 900
-          y: 1000
-```
+---
+
+## **How to Set Up**
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/yourusername/diy-repair-assistant.git
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the bot locally:
+   ```bash
+   python app.py
+   ```
+4. Customize the YAML configuration to add or modify repair workflows.
+
+---
+
+## **Future Plans**
+- Integration with voice assistants for hands-free repair guidance.
+- Multi-language support.
+- Advanced photo analysis for better problem diagnosis.
+
+---
+
+## **Contributing**
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests to help improve the DIY Repair Assistant.

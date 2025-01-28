@@ -1,7 +1,7 @@
 # DIY repair assistant
 
 ## Description:
-DIY assistent assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
+DIY assistant assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
 
 ```yml
 app:
@@ -9,7 +9,7 @@ app:
   icon: 🤖
   icon_background: '#FFEAD5'
   mode: advanced-chat
-  name: DIY - reparation assistent
+  name: DIY - reparation assistant
   use_icon_as_answer_icon: true
   kind: app
   version: 0.1.5

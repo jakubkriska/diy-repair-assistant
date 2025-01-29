@@ -58,20 +58,10 @@ workflow:
       language: ''
       voice: ''
     opening_statement: >
-      Hello! I'm your DIY Repair Assistant. 🛠️
+      Hey there! 👋 I'm your DIY Repair Assistant. What are you trying to fix today? 
 
-      I’m here to help you repair household items with step-by-step guidance based on
-      common repair techniques and examples. Please note that my suggestions are general
-      and may need some adaptation to fit your specific situation. Also, I only assist
-      with **item repairs**—not medical, legal, or other non-repair-related topics.
-
-      To get started, here’s how you can help me help you:
-      1️⃣ Tell me what item you’re repairing (e.g., chair, faucet, phone).
-      2️⃣ Describe the specific issue (e.g., wobbly, leaking, not turning on).
-      3️⃣ Let me know if there’s any visible damage (e.g., cracks, wear, fraying).
-
-      You can also upload a photo of the item for more precise guidance. Let’s fix it together!
-
+      Just describe the issue, and I'll guide you step by step. 
+      Keep it simple—I'll ask if I need more details. Let's get started! 🚀
   graph:
     edges:
       - data:
@@ -90,11 +80,18 @@ workflow:
         type: custom
       - data:
           sourceType: visual_support
-          targetType: material_recommendations
-        id: visual-support-to-material-recommendations
+          targetType: diagnosis
+        id: visual-support-to-diagnosis
         source: visual_support
-        target: material_recommendations
+        target: diagnosis
         type: custom
+      - data:
+          sourceType: diagnosis
+          targetType: material_recommendations
+        id: diagnosis-to-material-recommendations
+        source: diagnosis
+        target: material_recommendations
+        type: custom        
       - data:
           sourceType: material_recommendations
           targetType: motivation_and_support
@@ -136,6 +133,32 @@ workflow:
           x: 80
           y: 100
       - data:
+          title: Diagnosis
+          desc: "Ensures the bot fully understands the issue before suggesting a fix."
+          type: diagnosis
+          prompt: >
+            Let's diagnose the problem. Follow this structure:
+            1️⃣ Ask the user for a **simple** problem description.
+            2️⃣ Identify if the issue is **damage**, **functionality**, or **appearance**.
+            3️⃣ Ask if the user sees any **visible issues** (cracks, missing parts).
+            4️⃣ Ask if they notice **sounds, smells, or movement issues** if applicable.
+            5️⃣ Ask if anything happened **before the issue started**.
+            6️⃣ Ask if they have **tried any fixes** already.
+
+            👉 **IMPORTANT:**  
+            - If the user struggles, break it into **one question at a time**  
+            - If they upload an image, move to **Visual Support**  
+            - If they answer at least **three diagnostic questions**, move to **Material Recommendations**
+            - Always **keep responses short** and **guide step by step**.
+            """
+          next_step:
+            requires_visual: visual_support
+            diagnosis_complete: material_recommendations
+        id: diagnosis
+        position:
+          x: 300
+          y: 200
+      - data:
           title: Visual Support
           desc: "Provides visual aids (diagrams, videos) to help with the repair."
           type: visual_support
@@ -145,11 +168,11 @@ workflow:
             - **Step Diagrams**: {diagram_link}
 
             Let me know if you need further clarification!
-          next_step: material_recommendations
+          next_step: diagnosis
         id: visual_support
         position:
           x: 300
-          y: 200
+          y: 200        
       - data:
           title: Material Recommendations
           desc: "Suggests materials and tools needed for the repair."

@@ -5,7 +5,7 @@
   "icon": "🤖",
   "icon_background": "#FFEAD5",
   "mode": "advanced-chat",
-  "name": "DIY - reparation assistent",
+  "name": "DIY - reparation assistant",
   "use_icon_as_answer_icon": true,
   "workflow": {
     "conversation_variables": [],
@@ -215,4 +215,16 @@
             "title": "End",
             "desc": "Thank the user and end the interaction.",
             "type": "end",
-            "prompt": "Thank you for using DIY Repair Assistant! If you have more items to fix in the future, I’m always here to help.
+            "prompt": "Thank you for using DIY Repair Assistant! If you have more items to fix in the future, I’m always here to help."
+          },
+          "id": "end",
+          "position": {
+            "x": 900,
+            "y": 1000
+          }
+        }
+      ]
+    }
+  }
+}
+

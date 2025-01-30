@@ -1,9 +1,3 @@
-# DIY repair assistant
-
-## Description:
-DIY assistant assisting with diagnosis of damaged objects providing tailored step-by-step reparation guides.
-
-```yml
 app:
   description: Assisting you in the process of reparations of various objects.
   icon: 🤖
@@ -230,4 +224,3 @@ workflow:
         position:
           x: 900
           y: 1000
-```

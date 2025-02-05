@@ -1,5 +1,0 @@
-flask
-pyyaml
-groq
-python-dotenv
-requests

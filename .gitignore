@@ -47,3 +47,4 @@ poetry.lock
 
 # Flask-specific cache files
 instance/
+.env

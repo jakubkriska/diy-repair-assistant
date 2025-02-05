@@ -4,9 +4,16 @@ import os
 import yaml
 import requests
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 from dotenv import load_dotenv
 from colorama import Fore, Style, init
+from flask_cors import CORS
+
+# Initialize Flask app
+app = Flask(__name__)
+
+# Enable CORS for all routes
+CORS(app)
 
 # Configure logging
 
@@ -114,11 +121,128 @@ def print_response_with_history(response):
     for line in terminal_history:
         print(line)
 
+# Route to HTML interface
+@app.route("/", methods=["GET"])
+def index():
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DIY Repair Assistant</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                padding: 10px;
+                background-color: #f4f4f4;
+            }
+            .chat-box {
+                border: 1px solid #ccc;
+                padding: 15px;
+                background-color: #fff;
+                max-width: 600px;
+                margin: 0 auto;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+            .message {
+                margin: 10px 0;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            .user-message {
+                background-color: #d1e7dd;
+                text-align: right;
+            }
+            .bot-message {
+                background-color: #f8d7da;
+            }
+            input[type="text"] {
+                width: calc(100% - 50px);
+                padding: 10px;
+                margin: 10px 0;
+            }
+            button {
+                padding: 10px 15px;
+                background-color: #007bff;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="chat-box" id="chat-box">
+            <h2>DIY Repair Assistant</h2>
+            <div id="chat-messages"></div>
+            <input type="text" id="user-input" placeholder="Type your message here..." />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+
+        <script>
+            async function sendMessage() {
+                const inputElement = document.getElementById('user-input');
+                const message = inputElement.value;
+
+                if (!message.trim()) return;
+
+                // Display user message
+                addMessage('You', message, 'user-message');
+
+                // Clear the input field
+                inputElement.value = '';
+
+                try {
+                    // Send message to the backend
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ message })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        addMessage('Bot', data.response, 'bot-message');
+                    } else {
+                        addMessage('Bot', 'Error: Failed to get a response from the server.', 'bot-message');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    addMessage('Bot', 'Error: Could not reach the server.', 'bot-message');
+                }
+            }
+
+            function addMessage(sender, text, cssClass) {
+                const chatMessages = document.getElementById('chat-messages');
+                const messageElement = document.createElement('div');
+                messageElement.className = `message ${cssClass}`;
+                messageElement.innerHTML = `<strong>${sender}:</strong> ${text}`;
+                chatMessages.appendChild(messageElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        </script>
+    </body>
+    </html>
+    """)
+
 @app.route("/chat", methods=["POST"])
 def chat():
+    # Check for the correct Content-Type header
+    if not request.is_json:
+        return jsonify({"error": "Unsupported Media Type. Use Content-Type: application/json"}), 415
+
     """
     API endpoint to process user messages.
     """
+
     user_input = request.json.get("message", "")
     if not user_input:
         return jsonify({"error": "No message provided"}), 400
@@ -127,36 +251,40 @@ def chat():
     return jsonify({"response": bot_response})
 
 if __name__ == "__main__":
-    # Check if running in interactive mode
-    mode = input("Enter mode (web/terminal): ").strip().lower()
-    if mode == "web":
-        app.run(debug=True)
-    elif mode == "terminal":
-        print("\n========== DIY Repair Assistant ==========\n")
-        print(f"{Fore.CYAN}\nWelcome to the DIY Repair Assistant! 🛠️")
-        print(f"{Fore.CYAN}I’m here to help you diagnose and fix household items step-by-step.")
-        print("=========================================")
-        print(f"{Fore.CYAN}You can type your problem description, and I'll guide you further.")
-        print("=========================================")
-        print(f"{Fore.CYAN}(Type 'exit' or 'quit' to end the chat at any time.)")
-        print("=========================================")
-        print("\nLet's get started!\n")
-        
-        while True:
-            user_input = input(f"{Fore.GREEN}You: ")
-            if user_input.lower() in ['exit', 'quit']:
-                print(f"{Fore.RED}Exiting chat... Goodbye!")
-                break
-            response = generate_response_with_context(user_input)
-            
-            print(f"{Fore.MAGENTA}\n-----------------------------------")
-            
-            print(f"Bot: {Fore.LIGHTBLACK_EX}{response.splitlines()[0]}")
-            if len(response.splitlines()) > 1:
-                for line in response.splitlines()[1:]:
-                    print("    " + line)  # Indent each additional line
-
-            print(f"{Fore.MAGENTA}-----------------------------------\n")
+    # Skip the input prompt on auto-reload
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        app.run(debug=True, host='127.0.0.1', port=5000)
     else:
-        print("Invalid mode. Use 'web' or 'terminal'.")
+        # Check if running in interactive mode
+        mode = input("Enter mode (web/terminal): ").strip().lower()
+        if mode == "web":
+            app.run(debug=True, host='127.0.0.1', port=5000)
+        elif mode == "terminal":
+            print("\n========== DIY Repair Assistant ==========\n")
+            print(f"{Fore.CYAN}\nWelcome to the DIY Repair Assistant! 🛠️")
+            print(f"{Fore.CYAN}I’m here to help you diagnose and fix household items step-by-step.")
+            print("=========================================")
+            print(f"{Fore.CYAN}You can type your problem description, and I'll guide you further.")
+            print("=========================================")
+            print(f"{Fore.CYAN}(Type 'exit' or 'quit' to end the chat at any time.)")
+            print("=========================================")
+            print("\nLet's get started!\n")
+            
+            while True:
+                user_input = input(f"{Fore.GREEN}You: ")
+                if user_input.lower() in ['exit', 'quit']:
+                    print(f"{Fore.RED}Exiting chat... Goodbye!")
+                    break
+                response = generate_response_with_context(user_input)
+                
+                print(f"{Fore.MAGENTA}\n-----------------------------------")
+                
+                print(f"Bot: {Fore.LIGHTBLACK_EX}{response.splitlines()[0]}")
+                if len(response.splitlines()) > 1:
+                    for line in response.splitlines()[1:]:
+                        print("    " + line)  # Indent each additional line
+
+                print(f"{Fore.MAGENTA}-----------------------------------\n")
+        else:
+            print("Invalid mode. Use 'web' or 'terminal'.")
 

@@ -51,10 +51,57 @@ workflow:
       language: ''
       voice: ''
     opening_statement: >
-      Hey there! 👋 I'm your DIY Repair Assistant. What are you trying to fix today? 
+      Hey there! 👋 I'm your DIY Repair Assistant! I’m here to help, step by step.  
 
-      Just describe the issue, and I'll guide you step by step. 
-      Keep it simple—I'll ask if I need more details. Let's get started! 🚀
+      Whether you’re fixing something big or small, I’ll guide you patiently and encourage you along the way.  
+      No worries if you’re unsure — I’ll ask the right questions to make it easy.
+
+      Let’s get started on your repair journey! 🛠️✨ 
+
+      ⚠️ **Important:** I only provide assistance for repair and maintenance tasks. 
+      I do NOT answer general questions about unrelated topics such as news, sports, politics, or entertainment.
+    response_format: |
+      - **Diagnosis Summary**
+        - Issue Type: {issue_type}
+        - Visible Damage: {visible_damage}
+        - Symptoms Reported: {symptoms_reported}
+        - Image findings: {image_findings}
+        - Attempted Fixes: {attempted_fixes}
+
+      - **Recommended Next Steps**
+        - Step 1: {step_one}
+        - Step 2: {step_two}
+        - Step 3: {step_three}
+        - Tools Required: {tools_required}    
+
+      - **Analysis Results**
+        - Image Findings: {image_analysis_results}
+        - Damage Severity: {damage_severity}
+
+prompts:
+  image_upload_instruction: >
+    You uploaded an image. Please describe any additional symptoms or damage not visible in the image. 
+    I'll analyze the picture and provide an assessment shortly.
+  diagnosis:
+    prompt: "Let's diagnose the issue. Describe the problem, including symptoms or visible damage."
+  diagnosis_follow_up: >
+    Based on the analysis of the image, I’ve identified {damage_type}. Here’s a step-by-step guide to addressing it.
+  image_analysis_prompt: >
+    The image analysis detected {damage_type}. Does this match what you observed?
+    - Yes: I’ll provide further steps to resolve it.
+    - No: Let’s investigate more. Please describe any other symptoms or signs.
+  interaction_steps:
+    - step: 1
+      name: "Identify Problem"
+      prompt: "What item are you trying to repair?"
+    - step: 2
+      name: "Describe Symptoms"
+      prompt: "Can you describe the symptoms and visible damage on the item?"
+    - step: 3
+      name: "Upload Image (Optional)"
+      prompt: "If possible, upload an image of the item for visual analysis."
+
+
   graph:
     edges:
       - data:

@@ -1,5 +1,6 @@
 # Imports
 
+import markdown
 import os
 import yaml
 import requests
@@ -8,6 +9,8 @@ from flask import Flask, request, jsonify, render_template_string
 from dotenv import load_dotenv
 from colorama import Fore, Style, init
 from flask_cors import CORS
+import json
+import re
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -43,17 +46,32 @@ if not GROQ_API_URL:
 
 app = Flask(__name__)
 
-# Load chatbot configuration from config.yaml
-
 try:
     with open("config.yaml", "r") as file:
         bot_config = yaml.safe_load(file)
+        print(json.dumps(bot_config, indent=2))  # Debug: Check the structure of the loaded YAML data
 except FileNotFoundError:
     raise FileNotFoundError("Error: config.yaml not found. Ensure it exists in the project directory.")
 
 # Memory to track ongoing conversation
 
 conversation_history = []
+
+diagnosis_prompt = bot_config['prompts']['diagnosis']['prompt']
+
+def is_relevant_message(message):
+    """
+    Checks if the user message is related to DIY repairs.
+    """
+    irrelevant_keywords = [
+        "weather", "politics", "news", "movies", "games", "sports", "celebrities",
+        "music", "AI", "programming", "science", "history", "relationships", "jokes"
+    ]
+
+    message_lower = message.lower()
+    
+    # Check if message contains irrelevant topics
+    return not any(keyword in message_lower for keyword in irrelevant_keywords)
 
 def generate_response_with_context(user_input):
     """
@@ -74,27 +92,105 @@ def generate_response_with_context(user_input):
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
-
-    response = requests.post(url=GROQ_API_URL, headers=headers, json=data)
-
-    # Handle response
-    if response.status_code == 200:
-        try:
-            response_text = response.json()["choices"][0]["message"]["content"].strip()
-            conversation_history.append({"role": "assistant", "content": response_text})
-
-            # Limit the history length to 10 messages
-            if len(conversation_history) > 10:
-                conversation_history.pop(0)
-            return response_text
-
-        except (KeyError, IndexError):
-            logging.error("Unexpected response format from API")
-            return "Error: Unexpected response format from API."
-    else:
-        logging.error(f"API error: {response.json()}")
-        return f"Error: {response.json().get('error', 'Unknown error')}"
     
+    try:
+        response = requests.post(url=GROQ_API_URL, headers=headers, json=data, timeout=10)
+
+        # Debugging: Print the raw API response
+        print("Raw API Response:", json.dumps(response.json(), indent=2))  # Debugging
+
+        # Handle response
+        if response.status_code == 200:
+            try:
+                api_response = response.json()
+                print("Formatted API Response:", json.dumps(api_response, indent=2))  # Debug print
+
+                response_text = api_response.get("choices", [{}])[0].get("message", {}).get("content", "No content").strip()
+
+                # Apply YAML-based formatting
+                formatted_response = apply_yaml_format(response_text) if "response_format" in bot_config else f"{response_text} 😊 Keep going, you're doing great!"
+
+                # Add response to chat history
+                conversation_history.append({"role": "assistant", "content": formatted_response})
+
+                # Limit history length
+                if len(conversation_history) > 10:
+                    conversation_history.pop(0)
+
+                return format_response(formatted_response)
+
+            except (KeyError, IndexError, json.JSONDecodeError) as e:
+                logging.error("Unexpected response format from API")
+                logging.error(e)
+                return "Error: Unexpected response format from API."
+
+        # Handle API errors
+        logging.error(f"API error: {response.json()}")
+        return "Oops! It looks like I ran into a small issue. Let’s try again in a moment. 😊"
+
+    except requests.exceptions.RequestException as e:
+        logging.error("Request failed: %s", e)
+        return "Error: Could not connect to the server. Please try again later."
+    
+def apply_yaml_format(raw_response):
+    """
+    Apply the response format defined in the YAML configuration.
+    """
+    response_format = bot_config['workflow']['features'].get('response_format', '').strip()
+    response_data = parse_response_data(raw_response)
+
+    if response_format and response_data:
+        try:
+            formatted_response = response_format.format(**response_data)
+            print("Final formatted response before sending to frontend:", repr(formatted_response))  # Debugging
+            return formatted_response.replace("\n", "<br>")  # Ensure line breaks
+        except KeyError as e:
+            logging.error("Missing data for response formatting: %s", e)
+
+    return raw_response.replace("\n", "<br>")
+
+def parse_response_data(response_text):
+    """
+    Extract relevant information from the response text.
+    """
+    response_lines = response_text.split("\n")
+    response_data = {}
+
+    # Look for patterns to extract key information
+    for line in response_lines:
+        if "Issue Type:" in line:
+            response_data['issue_type'] = line.split(":")[1].strip()
+        elif "Visible Damage:" in line:
+            response_data['visible_damage'] = line.split(":")[1].strip()
+        elif "Symptoms Reported:" in line:
+            response_data['symptoms_reported'] = line.split(":")[1].strip()
+        elif "Step 1:" in line:
+            response_data['step_one'] = line.split(":")[1].strip()
+        elif "Step 2:" in line:
+            response_data['step_two'] = line.split(":")[1].strip()
+        elif "Step 3:" in line:
+            response_data['step_three'] = line.split(":")[1].strip()
+        elif "Tools Required:" in line:
+            response_data['tools_required'] = line.split(":")[1].strip()
+        elif "Image Findings:" in line:
+            response_data['image_findings'] = line.split(":")[1].strip()
+
+    return response_data
+
+def format_response(response_text):
+    response_text = markdown.markdown(response_text)  # Convert Markdown to HTML
+    
+    lines = response_text.split("\n")
+    formatted_lines = []
+    
+    for line in lines:
+        if line.strip().startswith("<ul>") or line.strip().startswith("<li>") or line.strip().isdigit():
+            formatted_lines.append(line)  # Preserve existing HTML lists
+        else:
+            formatted_lines.append(f"<p>{line.strip()}</p>")  # Wrap paragraphs in <p> tags
+    
+    return "".join(formatted_lines)  # Return full HTML string
+
 def print_response_with_history(response):
     """
     Print the bot response with limited terminal history and color formatting.
@@ -246,19 +342,39 @@ def chat():
     user_input = request.json.get("message", "")
     if not user_input:
         return jsonify({"error": "No message provided"}), 400
+    
+        # Check if the message is relevant
+    if not is_relevant_message(user_input):
+        return jsonify({"response": "I’d love to help you with a repair! 😊 Let’s focus on fixing something"})
 
     bot_response = generate_response_with_context(user_input)
+
+    print("Final bot response:", bot_response)  # Debugging print to check response format
+
     return jsonify({"response": bot_response})
+
+@app.route("/upload-image", methods=["POST"])
+def upload_image():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    # Here you would process the image (e.g., save it, analyze it, etc.)
+    # For now, we'll just return a success message
+    return jsonify({"message": "Image uploaded successfully!"})
 
 if __name__ == "__main__":
     # Skip the input prompt on auto-reload
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        app.run(debug=True, host='127.0.0.1', port=5000)
+        app.run(debug=True, host='0.0.0.0', port=5001)
     else:
         # Check if running in interactive mode
         mode = input("Enter mode (web/terminal): ").strip().lower()
         if mode == "web":
-            app.run(debug=True, host='127.0.0.1', port=5000)
+            app.run(debug=True, host='0.0.0.0', port=5001)
         elif mode == "terminal":
             print("\n========== DIY Repair Assistant ==========\n")
             print(f"{Fore.CYAN}\nWelcome to the DIY Repair Assistant! 🛠️")

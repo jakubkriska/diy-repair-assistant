@@ -1,5 +1,26 @@
+#########################################
+# Core ML & Vision Dependencies
+#########################################
+torch
+torchvision
+Pillow           # For image processing (PIL)
+
+#########################################
+# Web Server Dependencies
+#########################################
 flask
-pyyaml
-groq
-python-dotenv
-requests
+flask-cors
+
+#########################################
+# Groq API Integration
+#########################################
+groq             # LLaMA Vision model integration
+
+#########################################
+# Utility Libraries
+#########################################
+PyYAML           # For YAML configuration parsing
+python-dotenv    # For loading environment variables
+requests         # For HTTP requests
+markdown         # For response formatting
+colorama         # For terminal text coloring

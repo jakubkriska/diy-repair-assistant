@@ -24,7 +24,7 @@ workflow:
       allowed_file_upload_methods:
         - local_file
         - remote_url
-      enabled: false
+      enabled: true
       fileUploadConfig:
         audio_file_size_limit: 50
         batch_count_limit: 5
@@ -75,8 +75,7 @@ workflow:
         - Tools Required: {tools_required}    
 
       - **Analysis Results**
-        - Image Findings: {image_analysis_results}
-        - Damage Severity: {damage_severity}
+        - Description: {image_analysis_results}
 
 prompts:
   image_upload_instruction: >
@@ -85,11 +84,15 @@ prompts:
   diagnosis:
     prompt: "Let's diagnose the issue. Describe the problem, including symptoms or visible damage."
   diagnosis_follow_up: >
-    Based on the analysis of the image, I’ve identified {damage_type}. Here’s a step-by-step guide to addressing it.
+    Great job describing the issue! 😊 I’ve also analyzed the image and here’s what I found:
+    {image_analysis_results}
+    Let’s proceed step by step to address the issue.
+
   image_analysis_prompt: >
-    The image analysis detected {damage_type}. Does this match what you observed?
-    - Yes: I’ll provide further steps to resolve it.
-    - No: Let’s investigate more. Please describe any other symptoms or signs.
+    The image analysis reported: {image_analysis_results}.
+    Does this match your observations?
+    - Yes: Great, I’ll guide you to the next steps.
+    - No: Please provide more details about what you see.
   interaction_steps:
     - step: 1
       name: "Identify Problem"

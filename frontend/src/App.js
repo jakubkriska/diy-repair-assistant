@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import logo from './logo.svg';
 import './App.css';
 
+
+
 function App() {
   // State variables
   const [message, setMessage] = useState('');
@@ -24,7 +26,7 @@ function App() {
     try {
       // Send message to Flask backend
       const response = await axios.post(
-        'http://127.0.0.1:5000/chat',
+        'http://127.0.0.1:5001/chat',
         { message },
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -49,42 +51,46 @@ function App() {
   // Function to handle image upload
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-
+  
     if (!file) return;
-
+    console.log(`[DEBUG] Selected file: ${file.name}`);
+  
     // Create a new FileReader instance
     const reader = new FileReader();
-
-    // When the file is read, update the state with the preview image
-    reader.onloadend = () => {
-      if (reader.result) {
-        console.log("Image preview data:", reader.result); // Debugging log
-        setImagePreview(reader.result); // Update React state
-      }
-    };
-
-    // Read the file as a Data URL to generate a preview
+  
+    reader.onloadend = () => console.log(`[DEBUG] Image preview data loaded.`);
+  
     reader.readAsDataURL(file);
-
+  
     try {
-      // Send the image to the backend
       const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await axios.post('http://127.0.0.1:5000/upload-image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      formData.append("file", file);
+      console.log("[DEBUG] Sending image to /upload-image endpoint...");
+      const response = await axios.post("http://127.0.0.1:5001/upload-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
+      console.log("[DEBUG] Image analysis response:", response.data);
+      
+      const damageResults = response.data.image_analysis_results;
 
-      // Handle the response (e.g., display analysis results)
+      // 🔥 Send analysis results to chat endpoint
+      const chatResponse = await axios.post(
+        "http://127.0.0.1:5001/chat",
+        { message: "Here are the image analysis results.", image_analysis_results: damageResults },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      // 💬 Add result to chat
       setChatHistory((prev) => [
         ...prev,
-        { sender: 'bot', text: response.data.message || 'Image processed successfully.' },
+        { sender: "bot", text: chatResponse.data.response || "I couldn't process the analysis. Can you try again?" }
       ]);
+  
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error("Error uploading image:", error);
       setChatHistory((prev) => [
         ...prev,
-        { sender: 'bot', text: 'Error: Could not upload the image.' },
+        { sender: "bot", text: "Error: Could not upload the image." },
       ]);
     }
   };

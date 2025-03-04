@@ -113,6 +113,9 @@ The project consists of two main components:
     -   Upload images using the paperclip icon.  Annotate the image using the canvas tools (draw, undo, clear) displayed below the image preview.
     -   The assistant will analyze the image and integrate the analysis into the ongoing conversation.
 
+<img width="500" alt="Skærmbillede 2025-03-04 kl  11 52 09" src="https://github.com/user-attachments/assets/c248a114-d199-4bd6-a79a-a0c0044677fe" />
+
+
 ### Terminal Mode <a name="terminal-mode"></a>
 
 1.  **Run the Backend in Terminal Mode:**
@@ -124,6 +127,7 @@ The project consists of two main components:
 
 ## Project Structure <a name="project-structure"></a>
 
+<!--
 diy-repair-assistant/
 ├── backend/
 │   ├── app.py                # Main Flask application
@@ -139,6 +143,10 @@ diy-repair-assistant/
 │   ├── package.json          # Node.js dependencies and scripts
 │   └── ...
 └── README.md
+-->
+
+<img width="800" alt="Skærmbillede 2025-03-04 kl  11 57 00" src="https://github.com/user-attachments/assets/91180485-3c85-4b0c-879f-62899f2d8aba" />
+
 
 ## Configuration <a name="configuration"></a>
 

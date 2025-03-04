@@ -11,7 +11,7 @@ from flask import Flask, request, jsonify, render_template_string
 from dotenv import load_dotenv
 from colorama import Fore, Style, init
 from flask_cors import CORS
-from llama_vision_integration import analyze_image_llama_vision  # New integration module
+from lvl import process_image
 from PIL import Image
 
 # Initialize Flask app
@@ -82,7 +82,7 @@ def generate_response_with_context(user_input):
         if response.status_code == 200:
             api_response = response.json()
             response_text = api_response.get("choices", [{}])[0].get("message", {}).get("content", "No content").strip()
-            formatted_response = apply_yaml_format(response_text) if "response_format" in bot_config else f"{response_text} 😊 Keep going, you're doing great!"
+            formatted_response = apply_yaml_format(response_text) if "response_format" in bot_config else response_text
             conversation_history.append({"role": "assistant", "content": formatted_response})
             if len(conversation_history) > 10:
                 conversation_history.pop(0)
@@ -232,14 +232,9 @@ def chat():
         return jsonify({"error": "Unsupported Media Type. Use Content-Type: application/json"}), 415
 
     user_input = request.json.get("message", "")
-    image_analysis_results = request.json.get("image_analysis_results", None)  # ⬅️ Get image results
 
     if not user_input:
         return jsonify({"error": "No message provided"}), 400
-
-    # ✅ If image analysis results are provided, append them to user input
-    if image_analysis_results:
-        user_input += f"\n[Image Analysis Results: {image_analysis_results}]"
 
     if not is_relevant_message(user_input):
         return jsonify({"response": "I’d love to help you with a repair! 😊 Let’s focus on fixing something."})
@@ -267,9 +262,24 @@ def upload_image():
         file.save(file_path)
         print(f"[DEBUG] File saved at: {file_path}")
         try:
-            analysis = analyze_image_llama_vision(file_path)
+            # Process the image using process_image from lvl.py
+            analysis = process_image(file_path)
             print(f"[DEBUG] Image Analysis Results: {analysis}")
-            return jsonify({'image_analysis_results': analysis}), 200
+            
+            # Create a natural response from the DIY assistant
+            natural_response = (
+                f"Thank you for uploading the image. Based on my analysis, I noticed that {analysis} "
+                f"Does this description match what you see?"
+            )
+            
+            # Append the natural response to the conversation history
+            conversation_history.append({
+                "role": "assistant",
+                "content": natural_response
+            })
+            
+            # Return the natural response to the frontend
+            return jsonify({'image_analysis_results': natural_response}), 200
         except Exception as e:
             print(f"[ERROR] Image analysis failed: {e}")
             return jsonify({'error': str(e)}), 500

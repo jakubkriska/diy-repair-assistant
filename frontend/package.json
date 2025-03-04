@@ -4,11 +4,15 @@
   "private": true,
   "dependencies": {
     "16": "^0.0.2",
+    "@react-hookz/web": "^25.0.1",
     "axios": "^1.7.9",
     "cra-template": "1.2.0",
+    "konva": "^9.3.18",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-scripts": "^3.0.1",
+    "react-konva": "^19.0.3",
+    "react-scripts": "^5.0.1",
+    "use-image": "^1.1.1",
     "web-vitals": "^4.2.4"
   },
   "scripts": {

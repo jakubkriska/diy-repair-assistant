@@ -122,7 +122,7 @@ function App() {
       const response = await axios.post("http://127.0.0.1:5001/upload-image", formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setChatHistory([...chatHistory, { sender: "bot", text: response.data.image_analysis_results || "Analysis failed" }]);
+      setChatHistory([...chatHistory, { sender: "bot", text: response.data.response || "Error: No response received from server." }]);
       setImagePreview(null);
       setShapes([]);
     } catch (error) {

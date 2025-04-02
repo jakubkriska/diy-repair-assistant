@@ -1,5 +1,6 @@
 # Imports
 import markdown
+import time
 import os
 import yaml
 import requests
@@ -13,17 +14,22 @@ from colorama import Fore, Style, init
 from flask_cors import CORS
 from lvl import process_image
 from PIL import Image
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from werkzeug.utils import secure_filename
 
-# Initialize Flask app
-app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+LOGS_DIR = "backend/logs"
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)
-
-# Terminal history settings
-MAX_HISTORY_LINES = 15
-terminal_history = []  # Store chat output history
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(LOGS_DIR, "app.log")),  # Save logs to a file
+        logging.StreamHandler()  # Also print logs in the terminal
+    ]
+)
 
 # Load environment variables from .env
 load_dotenv()
@@ -32,19 +38,66 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_API_URL = os.getenv("GROQ_API_URL")
 
-# Check if the variables are set correctly
-if not GROQ_API_KEY:
-    raise ValueError("Error: GROQ_API_KEY is not set. Please check your .env file.")
-if not GROQ_API_URL:
-    raise ValueError("Error: GROQ_API_URL is not set. Please check your .env file.")
+# Define the retry mechanism
+@retry(
+    stop=stop_after_attempt(3),  # Use () to instantiate
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type(requests.exceptions.RequestException),
+    before=lambda retry_state: logging.warning(f"Retrying API call (attempt {retry_state.attempt_number})...")
+)
+def fetch_groq_response(data, headers):
+    """
+    Sends request to Groq API with retry mechanism.
+    """
+    try:
+        response = requests.post(url=GROQ_API_URL, headers=headers, json=data, timeout=10)
+        response.raise_for_status()  # Raise an exception for 4xx/5xx errors
+        return response.json()
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"[REQUEST ERROR] {req_err}, Retrying...")
+    except requests.exceptions.Timeout:
+        logging.error("[TIMEOUT] The API request timed out after 10 seconds.")
+        return {"error": "The request timed out. Please try again later.", "status_code": 408}
+
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"[HTTP ERROR {response.status_code}] {response.text}")
+        return {"error": f"API error {response.status_code}: {response.text}", "status_code": response.status_code}
+
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"[REQUEST ERROR] {req_err}")
+        return {"error": "A network error occurred. Please check your internet connection and try again.", "status_code": 503}
+
+    except Exception as err:
+        logging.critical(f"[UNKNOWN ERROR] {err}")
+        return {"error": "An unexpected error occurred. Please contact support.", "status_code": 500}
+    
+    if "error" in api_response:
+        logging.error(f"[ERROR] Groq API returned an error: {api_response['error']}")
+        return jsonify({"error": "Failed to get a response from the assistant."}), 500
+
+def validate_env_vars():
+    required_vars = ["GROQ_API_KEY", "GROQ_API_URL"]
+    for var in required_vars:
+        if not os.getenv(var):
+            raise ValueError(f"Error: {var} is missing. Check your .env file.")
+
+validate_env_vars()
+
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Terminal history settings
+MAX_HISTORY_LINES = 15
+terminal_history = []  # Store chat output history
 
 # Load YAML configuration
 try:
     with open("config.yaml", "r") as file:
         bot_config = yaml.safe_load(file)
-        print(json.dumps(bot_config, indent=2))  # Debug: Check YAML data
 except FileNotFoundError:
-    raise FileNotFoundError("Error: config.yaml not found. Ensure it exists in the project directory.")
+    logging.error("Error: config.yaml not found. Loading default configuration.")
+    bot_config = {"workflow": {"features": {"opening_statement": "Welcome! How can I help?"}}}
 
 # Memory to track ongoing conversation
 conversation_history = []
@@ -61,37 +114,38 @@ def is_relevant_message(message):
     message_lower = message.lower()
     return not any(keyword in message_lower for keyword in irrelevant_keywords)
 
+# Ensure image analysis is included in conversation if available
+image_analysis = next(
+    (msg["content"] for msg in reversed(conversation_history) if "image analysis" in msg.get("content", "").lower()), 
+    None
+)
+
 def generate_response_with_context(user_input):
     """
-    Sends user input and conversation history to Groq API and returns the chatbot's response.
+    Runs a single iteration for response generation after the vision model has refined the analysis.
     """
+
     conversation_history.append({"role": "user", "content": user_input})
+    logging.info(f"[DEBUG] Conversation history before API call: {conversation_history}")
+
     data = {
         "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "system", "content": bot_config['workflow']['features']['opening_statement']}] + conversation_history,
+        "messages": [{"role": "system", "content": bot_config['workflow']['features']['opening_statement']}] 
+                    + conversation_history[-9:],
         "max_tokens": 800
     }
+
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
+
+    api_response = fetch_groq_response(data, headers)
+    response_text = api_response.get("choices", [{}])[0].get("message", {}).get("content", "No content").strip()
+
+    conversation_history.append({"role": "assistant", "content": response_text})
     
-    try:
-        response = requests.post(url=GROQ_API_URL, headers=headers, json=data, timeout=10)
-        print("Raw API Response:", json.dumps(response.json(), indent=2))  # Debug print
-        if response.status_code == 200:
-            api_response = response.json()
-            response_text = api_response.get("choices", [{}])[0].get("message", {}).get("content", "No content").strip()
-            formatted_response = apply_yaml_format(response_text) if "response_format" in bot_config else response_text
-            conversation_history.append({"role": "assistant", "content": formatted_response})
-            if len(conversation_history) > 10:
-                conversation_history.pop(0)
-            return format_response(formatted_response)
-        logging.error(f"API error: {response.json()}")
-        return "Oops! It looks like I ran into a small issue. Let’s try again in a moment. 😊"
-    except requests.exceptions.RequestException as e:
-        logging.error("Request failed: %s", e)
-        return "Error: Could not connect to the server. Please try again later."
+    return response_text if response_text else "No valid response generated."
     
 def apply_yaml_format(raw_response):
     """
@@ -138,10 +192,13 @@ def format_response(response_text):
     lines = response_text.split("\n")
     formatted_lines = []
     for line in lines:
-        if line.strip().startswith("<ul>") or line.strip().startswith("<li>") or line.strip().isdigit():
+        line = line.strip()
+        if line.startswith("<ul>") or line.startswith("<li>") or line.isdigit():
             formatted_lines.append(line)
+        elif line:
+            formatted_lines.append(f"<p>{line}</p>")
         else:
-            formatted_lines.append(f"<p>{line.strip()}</p>")
+            formatted_lines.append("<br>")
     return "".join(formatted_lines)
 
 def print_response_with_history(response):
@@ -228,91 +285,137 @@ def index():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    if not request.is_json:
+    if request.content_type != "application/json":
+        logging.warning("[BAD REQUEST] Incorrect Content-Type.")
         return jsonify({"error": "Unsupported Media Type. Use Content-Type: application/json"}), 415
 
-    user_input = request.json.get("message", "")
+    user_input = request.json.get("message", "").strip()
 
     if not user_input:
-        return jsonify({"error": "No message provided"}), 400
+        logging.warning("[BAD REQUEST] No message provided.")
+        return jsonify({"error": "No message provided."}), 400
+
+    if len(user_input) > 500:
+        logging.warning(f"[BAD REQUEST] Message too long ({len(user_input)} chars).")
+        return jsonify({"error": "Message is too long. Please limit it to 500 characters."}), 400
 
     if not is_relevant_message(user_input):
+        logging.info("[FILTERED] Message was unrelated to DIY repairs.")
         return jsonify({"response": "I’d love to help you with a repair! 😊 Let’s focus on fixing something."})
 
-    bot_response = generate_response_with_context(user_input)
-    print("Final bot response:", bot_response)
-    return jsonify({"response": bot_response})
+    try:
+        bot_response = generate_response_with_context(user_input)
+        logging.info(f"[USER INPUT] {user_input}")
+        logging.info(f"[BOT RESPONSE] {bot_response}")
+        
+        return jsonify({"response": bot_response}) if bot_response else jsonify({"error": "No valid response generated."}), 500
+    
+    except Exception as e:
+        logging.error(f"[INTERNAL ERROR] {e}", exc_info=True)
+        return jsonify({"error": "An unexpected error occurred. Please try again later."}), 500
 
 UPLOAD_FOLDER = 'uploads/'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB limit
+
+def allowed_file(filename):
+    """Check if the uploaded file has an allowed extension."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def wait_for_file(file_path, retries=3, delay=0.05):
+    """Ensures the file is fully saved before processing."""
+    for _ in range(retries):
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            return True
+        time.sleep(delay)
+    return False
+
 @app.route('/upload-image', methods=['POST'])
 def upload_image():
-    if 'file' not in request.files:
-        print("[ERROR] No file part in the request.")
-        return jsonify({'message': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        print("[ERROR] No selected file.")
-        return jsonify({'message': 'No selected file'}), 400
-    if file:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        file.save(file_path)
-        print(f"[DEBUG] File saved at: {file_path}")
-        try:
-            # Process the image using process_image from lvl.py
-            analysis = process_image(file_path)
-            print(f"[DEBUG] Image Analysis Results: {analysis}")
-            
-            # Create a natural response from the DIY assistant
-            natural_response = (
-                f"Thank you for uploading the image. Based on my analysis, I noticed that {analysis} "
-                f"Does this description match what you see?"
-            )
-            
-            # Append the natural response to the conversation history
-            conversation_history.append({
-                "role": "assistant",
-                "content": natural_response
-            })
-            
-            # Return the natural response to the frontend
-            return jsonify({'image_analysis_results': natural_response}), 200
-        except Exception as e:
-            print(f"[ERROR] Image analysis failed: {e}")
-            return jsonify({'error': str(e)}), 500
+    global conversation_history
 
-if __name__ == "__main__":
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        app.run(debug=True, host='0.0.0.0', port=5001)
-    else:
-        mode = input("Enter mode (web/terminal): ").strip().lower()
-        if mode == "web":
-            app.run(debug=True, host='0.0.0.0', port=5001)
-        elif mode == "terminal":
-            print("\n========== DIY Repair Assistant ==========\n")
-            print(f"{Fore.CYAN}\nWelcome to the DIY Repair Assistant! 🛠️")
-            print(f"{Fore.CYAN}I’m here to help you diagnose and fix household items step-by-step.")
-            print("=========================================")
-            print(f"{Fore.CYAN}You can type your problem description, and I'll guide you further.")
-            print("=========================================")
-            print(f"{Fore.CYAN}(Type 'exit' or 'quit' to end the chat at any time.)")
-            print("=========================================")
-            print("\nLet's get started!\n")
-            
-            while True:
-                user_input = input(f"{Fore.GREEN}You: ")
-                if user_input.lower() in ['exit', 'quit']:
-                    print(f"{Fore.RED}Exiting chat... Goodbye!")
-                    break
-                response = generate_response_with_context(user_input)
-                print(f"{Fore.MAGENTA}\n-----------------------------------")
-                print(f"Bot: {Fore.LIGHTBLACK_EX}{response.splitlines()[0]}")
-                if len(response.splitlines()) > 1:
-                    for line in response.splitlines()[1:]:
-                        print("    " + line)
-                print(f"{Fore.MAGENTA}-----------------------------------\n")
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part in request'}), 400
+
+    file = request.files['file']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({'error': 'Invalid file type'}), 400
+
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+
+    logging.info(f"[FILE UPLOADED] {file_path}")
+
+    try:
+        # Step 1: Process the image using the vision model (4 iterations)
+        refined_analysis = process_image(file_path, iterations=4)
+
+        if "Analysis failed" in refined_analysis:
+            logging.error(f"[ERROR] Image analysis failed: {refined_analysis}")
+            return jsonify({'error': refined_analysis}), 500
+
+        logging.info(f"[IMAGE ANALYSIS COMPLETED] {refined_analysis}")
+
+        # Step 2: Use the refined analysis in the text model
+        text_prompt = (
+            f"The user uploaded an image. The image analysis returned this: '{refined_analysis}'. "
+            "Based on this, provide a detailed repair guide or troubleshooting steps."
+        )
+        conversation_history.append({"role": "assistant", "content": text_prompt})
+
+        # Step 3: Generate a response using the text model (1 iteration only)
+        final_response = generate_response_with_context(text_prompt)
+
+        # Store the response in conversation history
+        if final_response:
+            conversation_history.append({"role": "assistant", "content": final_response})
         else:
-            print("Invalid mode. Use 'web' or 'terminal'.")
+            logging.warning("[WARNING] No final response was generated.")
+
+        if final_response:
+            logging.info(f"[FINAL RESPONSE SENT] {final_response}")
+            return jsonify({'response': final_response}), 200
+        else:
+            logging.error("[ERROR] No valid response generated after text processing.")
+            return jsonify({'error': 'No valid response generated.'}), 500
+
+    except Exception as e:
+        logging.error(f"[ERROR] Image analysis failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == "__main__" and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+    mode = input("Enter mode (web/terminal): ").strip().lower()
+    
+    if mode == "web":
+        app.run(debug=True, host='0.0.0.0', port=5001, use_reloader=False)
+    
+    elif mode == "terminal":
+        print("\n========== DIY Repair Assistant ==========\n")
+        print(f"{Fore.CYAN}Welcome to the DIY Repair Assistant! 🛠️")
+        print(f"{Fore.CYAN}I’m here to help you diagnose and fix household items step-by-step.")
+        print("=========================================")
+        print(f"{Fore.CYAN}You can type your problem description, and I'll guide you further.")
+        print("=========================================")
+        print(f"{Fore.CYAN}(Type 'exit' or 'quit' to end the chat at any time.)")
+        print("\nLet's get started!\n")
+        
+        while True:
+            user_input = input(f"{Fore.GREEN}You: ").strip()
+            if user_input.lower() in ['exit', 'quit']:
+                print(f"{Fore.RED}Exiting chat... Goodbye!")
+                break
+            response = generate_response_with_context(user_input)
+            print(f"{Fore.MAGENTA}\n-----------------------------------")
+            print(f"Bot: {Fore.LIGHTBLACK_EX}{response.splitlines()[0]}")
+            if len(response.splitlines()) > 1:
+                for line in response.splitlines()[1:]:
+                    print("    " + line)
+            print(f"{Fore.MAGENTA}-----------------------------------\n")
+    
+    else:
+        print("Invalid mode. Please restart and choose 'web' or 'terminal'.")

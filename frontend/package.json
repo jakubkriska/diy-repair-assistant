@@ -5,7 +5,7 @@
   "dependencies": {
     "16": "^0.0.2",
     "@react-hookz/web": "^25.0.1",
-    "axios": "^1.7.9",
+    "axios": "^1.8.2",
     "cra-template": "1.2.0",
     "konva": "^9.3.18",
     "postcss": "^8.4.31",

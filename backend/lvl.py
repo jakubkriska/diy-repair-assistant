@@ -27,7 +27,7 @@ def process_image(image_path):
     
     # Use your original prompt exactly as provided:
     chat_completion = client.chat.completions.create(
-        model="llama-3.2-11b-vision-preview",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=[
             {
                 "role": "user",
